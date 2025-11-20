@@ -1,6 +1,14 @@
-Para rodar o baseline toposort:
+Para gerar o modelo de precedencia (restrição geografica)
+python generate_precedence.py --arq_blocos Modelo_de_Blocos.csv --arq_saida block_precedence.csv
 
-  python3 baseline_toposort.py
+Para rodar o baseline toposort:
+Arquivos necessários
+
+Modelo de Blocos.csv — modelo de blocos (separador ;)
+
+Modelo_com_Precedencias.csv — relações de precedência (separador ,)
+
+  python3 baseline_toposort.py --arq_blocos Modelo_de_Blocos.csv --arq_precs Modelo_com_Precedencias.csv --arq_out_blocks blocos_ordenados.csv --arq_out_sum resumo.csv --proc_cap_tpy 12000000 --discount 0.12  --anos 12
 
 
 Para rodar o algoritmo genético:

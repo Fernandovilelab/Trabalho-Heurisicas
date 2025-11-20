@@ -1,6 +1,31 @@
 import pandas as pd
+import argparse
 
-df = pd.read_csv("Modelo de Blocos.csv",sep=';')
+# ==========================
+# PARÂMETROS VIA EXECUÇÃO
+# ==========================
+parser = argparse.ArgumentParser(description="Gerador automático de precedências geométricas (9 vizinhos acima).")
+
+parser.add_argument(
+    "--arq_blocos",
+    type=str,
+    default="Modelo de Blocos.csv",
+    help="Arquivo de entrada contendo o modelo de blocos (com colunas id,x,y,z)."
+)
+
+parser.add_argument(
+    "--arq_saida",
+    type=str,
+    default="Modelo_com_Precedencias.csv",
+    help="Arquivo CSV de saída com as precedências geradas."
+)
+
+args = parser.parse_args()
+
+ARQ_INPUT = args.arq_blocos
+ARQ_OUT   = args.arq_saida
+
+df = pd.read_csv(ARQ_INPUT, sep=';')
 
 
 # Cria DataFrame auxiliar com as 9 coordenadas precedentes
@@ -25,7 +50,7 @@ for i in range(1, 10):
 df_out = pd.concat([df[["id"]], precedence[[f'prec{i}' for i in range(1, 10)]]], axis=1)
 
 # === Salva resultado ===
-df_out.to_csv("Modelo_com_Precedencias.csv", index=False)
+df_out.to_csv(ARQ_OUT, index=False)
 print(df_out.head())
 
 

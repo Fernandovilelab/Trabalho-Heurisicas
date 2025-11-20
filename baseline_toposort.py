@@ -19,17 +19,43 @@ Mostra no final o VPL total.
 
 import pandas as pd
 from collections import defaultdict
+import argparse
 
-# ========= CONFIG =========
-ARQ_BLOCOS = "Modelo de Blocos.csv"          # usa ';'
-ARQ_PRECS  = "Modelo_com_Precedencias.csv"   # padrão ','
-ARQ_OUT_BLOCKS = "toposort_baseline_blocks.csv"
-ARQ_OUT_SUM    = "toposort_baseline_summary.csv"
 
-PROC_CAP_TPY = 10_000_000   # 10 Mt/ano (só minério)
-DISCOUNT = 0.15
-ANOS = 9                    # Horizonte igual ao do site
+# ==========================
+# PARÂMETROS VIA EXECUÇÃO
+# ==========================
+parser = argparse.ArgumentParser()
 
+parser.add_argument("--arq_blocos", type=str, default="Modelo de Blocos.csv",
+                    help="Arquivo de blocos (;)")
+
+parser.add_argument("--arq_precs", type=str, default="Modelo_com_Precedencias.csv",
+                    help="Arquivo com precedências (,)")
+
+parser.add_argument("--arq_out_blocks", type=str, default="toposort_baseline_blocks.csv",
+                    help="Arquivo de saída dos blocos ordenados")
+
+parser.add_argument("--arq_out_sum", type=str, default="toposort_baseline_summary.csv",
+                    help="Arquivo de saída do sumário")
+
+parser.add_argument("--proc_cap_tpy", type=float, default=10_000_000,
+                    help="Capacidade de processamento (t/ano)")
+
+parser.add_argument("--discount", type=float, default=0.15,
+                    help="Taxa de desconto (ex: 0.15)")
+
+parser.add_argument("--anos", type=int, default=9,
+                    help="Número de anos do modelo")
+args = parser.parse_args()
+ARQ_BLOCOS      = args.arq_blocos
+ARQ_PRECS       = args.arq_precs
+ARQ_OUT_BLOCKS  = args.arq_out_blocks
+ARQ_OUT_SUM     = args.arq_out_sum
+
+PROC_CAP_TPY = args.proc_cap_tpy
+DISCOUNT     = args.discount
+ANOS         = args.anos
 # ========= LEITURA =========
 df = pd.read_csv(ARQ_BLOCOS, sep=';')
 df["id"] = df["id"].astype(int)
@@ -71,6 +97,11 @@ for b, ps in precedences.items():
         if p in all_ids:
             succs[p].append(b)
 
+
+remaining_preds = {b: len(precedences.get(b, [])) for b in all_ids}
+# Lista inicial de elegíveis
+eligible_list = [b for b in all_ids if remaining_preds[b] == 0]
+
 # Dicionários rápidos
 tonn = dict(zip(df["id"], df["tonn"]))
 dest = dict(zip(df["id"], df["destination"]))
@@ -88,10 +119,15 @@ def all_preds_mined(bid, mined):
     return all(p in mined for p in ps)
 
 def eligible(mined):
-    rem = [i for i in all_ids if i not in mined]
-    elig = [i for i in rem if all_preds_mined(i, mined)]
-    ores   = [i for i in elig if dest[i] == 1]
-    wastes = [i for i in elig if dest[i] == 2]
+    ores = []
+    wastes = []
+    for b in eligible_list:
+        if b in mined:
+            continue
+        if dest[b] == 1:
+            ores.append(b)
+        else:
+            wastes.append(b)
     return ores, wastes
 
 def missing_preds(bid, mined):
@@ -145,6 +181,10 @@ for year in range(1, ANOS + 1):
                     rows.append({"id": b, "year": year, "dest": 1, "tonn": t,
                                  "cashflow": cash, "discounted": disc, "z": zlev[b]})
                     mined.add(b)
+                    for child in succs.get(b, []):
+                        remaining_preds[child] -= 1
+                        if remaining_preds[child] == 0:
+                            eligible_list.append(child)
                     remaining -= t
                     placed_any = True
                     # continue tentando encher
@@ -174,6 +214,11 @@ for year in range(1, ANOS + 1):
             rows.append({"id": best_w, "year": year, "dest": 2, "tonn": tonn[best_w],
                          "cashflow": cash, "discounted": disc, "z": zlev[best_w]})
             mined.add(best_w)
+            for child in succs.get(best_w, []):
+                remaining_preds[child] -= 1
+                if remaining_preds[child] == 0:
+                    eligible_list.append(child)
+
             # volta ao loop: isso pode liberar novos minérios OU permitir que algum minério que não cabia seja trocado por outro que caiba
             continue
 
